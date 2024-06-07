@@ -1,11 +1,13 @@
 package logs
 
 import (
+	"context"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestConfigEnvLogLevels(t *testing.T) {
@@ -47,4 +49,19 @@ func TestConsoleErrorw(t *testing.T) {
 
 func TestErrorw(t *testing.T) {
 	Errorw("json-error", zap.String("foo", "bar"), zap.Int("number", 6))
+}
+
+func TestSetLogFile(t *testing.T) {
+	SetLogFile("test.log", 1, 3, 10, true)
+	logger := NewJSONLogger("somename")
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			logger.Infow("test", zap.String("foo", "bar"))
+		}
+	}
 }
