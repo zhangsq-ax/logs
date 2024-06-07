@@ -3,6 +3,7 @@ package logs
 import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"gopkg.in/natefinch/lumberjack.v2"
 	"os"
 	"time"
 )
@@ -33,6 +34,8 @@ var envLogLevels = map[string]zapcore.Level{
 
 // 默认日志级别
 var defaultLogLevel = zapcore.InfoLevel
+
+var writeSyncer zapcore.WriteSyncer = zapcore.AddSync(os.Stdout)
 
 // GetLogLevelEnvName 获取决定日志级别的环境变量名称
 func GetLogLevelEnvName() string {
@@ -68,8 +71,34 @@ func GetLogLevel() zapcore.Level {
 	}
 }
 
+func SetWriteSyncer(w *zapcore.WriteSyncer) {
+	if w == nil {
+		writeSyncer = zapcore.AddSync(os.Stdout)
+	} else {
+		writeSyncer = *w
+	}
+}
+
+// SetLogFile 设置日志文件，设置完成后日志会输出到此文件
+// logFile: 日志文件路径
+// maxSize：日志文件的最大大小，单位: MB
+// maxBackups：旧日志文件保留的最大个数
+// maxAge：旧日志文件保留的最大天数
+// compress：是否压缩旧日志文件，默认为 false
+func SetLogFile(logFile string, maxSize int, maxBackups int, maxAge int, compress bool) {
+	w := zapcore.AddSync(&lumberjack.Logger{
+		Filename:   logFile,
+		MaxSize:    maxSize,
+		MaxBackups: maxBackups,
+		MaxAge:     maxAge,
+		Compress:   compress,
+	})
+	SetWriteSyncer(&w)
+}
+
 func getLogger(encoderFun func(encoderConfig zapcore.EncoderConfig) zapcore.Encoder) *zap.Logger {
-	core := zapcore.NewCore(encoderFun(config), zapcore.AddSync(os.Stdout), GetLogLevel())
+	//core := zapcore.NewCore(encoderFun(config), zapcore.AddSync(os.Stdout), GetLogLevel())
+	core := zapcore.NewCore(encoderFun(config), writeSyncer, GetLogLevel())
 	return zap.New(core, zap.AddCaller(), zap.AddStacktrace(zap.WarnLevel))
 }
 
