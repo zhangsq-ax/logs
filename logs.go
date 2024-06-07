@@ -24,6 +24,8 @@ var config = zapcore.EncoderConfig{
 	}, //
 }
 
+var loggers = make(map[string]*zap.SugaredLogger)
+
 // 决定日志级别的环境变量名称
 var logLevelEnvName = "ENV"
 
@@ -124,4 +126,44 @@ func NewJSONLogger(names ...string) *zap.SugaredLogger {
 		}
 	}
 	return logger.Sugar()
+}
+
+func JSONLogger(names ...string) *zap.SugaredLogger {
+	var (
+		logger *zap.SugaredLogger
+		ok     bool
+		name   string
+	)
+	if len(names) > 0 {
+		name = names[0]
+	} else {
+		name = "default"
+	}
+	if logger, ok = loggers[name]; !ok {
+		logger = NewJSONLogger(name)
+		loggers[name] = logger
+	}
+	return logger
+}
+
+func ConsoleLogger(names ...string) *zap.SugaredLogger {
+	var (
+		logger *zap.SugaredLogger
+		ok     bool
+		name   string
+	)
+	if len(names) > 0 {
+		name = names[0]
+	} else {
+		name = "default"
+	}
+	if logger, ok = loggers[name]; !ok {
+		logger = NewConsoleLogger(name)
+		loggers[name] = logger
+	}
+	return logger
+}
+
+func Logger(names ...string) *zap.SugaredLogger {
+	return JSONLogger(names...)
 }
