@@ -64,6 +64,10 @@ func SetEnvLogLevel(envValue string, level zapcore.Level) {
 	envLogLevels[envValue] = level
 }
 
+func SetDefaultLogLevel(level zapcore.Level) {
+	defaultLogLevel = level
+}
+
 // GetLogLevel 获取当前的日志级别
 func GetLogLevel() zapcore.Level {
 	if level, ok := envLogLevels[os.Getenv(logLevelEnvName)]; ok {
