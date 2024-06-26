@@ -31,13 +31,20 @@ var logLevelEnvName = "ENV"
 
 // 环境变量值与日志级别的对应表，如果不存在则使用默认日志级别
 var envLogLevels = map[string]zapcore.Level{
-	"dev": zapcore.DebugLevel,
+	"dev":  zapcore.DebugLevel,
+	"test": zapcore.InfoLevel,
+	"prod": zapcore.WarnLevel,
 }
 
 // 默认日志级别
 var defaultLogLevel = zapcore.InfoLevel
 
 var writeSyncer zapcore.WriteSyncer = zapcore.AddSync(os.Stdout)
+
+var (
+	monitorTicker   *time.Ticker
+	monitorStopChan chan struct{}
+)
 
 // GetLogLevelEnvName 获取决定日志级别的环境变量名称
 func GetLogLevelEnvName() string {
@@ -65,7 +72,39 @@ func SetEnvLogLevel(envValue string, level zapcore.Level) {
 }
 
 func SetDefaultLogLevel(level zapcore.Level) {
+	loggers = make(map[string]*zap.SugaredLogger)
 	defaultLogLevel = level
+}
+
+func StartMonitorLogLevel(duration time.Duration) {
+	if duration == 0 {
+		duration = 10 * time.Second
+	}
+	go func() {
+		monitorTicker = time.NewTicker(duration)
+		monitorStopChan = make(chan struct{})
+		defer close(monitorStopChan)
+		for {
+			select {
+			case <-monitorTicker.C:
+				level := GetLogLevel()
+				if level != defaultLogLevel {
+					loggers = make(map[string]*zap.SugaredLogger)
+				}
+			case <-monitorStopChan:
+				return
+			}
+		}
+	}()
+}
+
+func StopMonitorLogLevel() {
+	if monitorTicker != nil && monitorStopChan != nil {
+		monitorTicker.Stop()
+		close(monitorStopChan)
+		monitorTicker = nil
+		monitorStopChan = nil
+	}
 }
 
 // GetLogLevel 获取当前的日志级别
