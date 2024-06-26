@@ -24,7 +24,10 @@ var config = zapcore.EncoderConfig{
 	}, //
 }
 
-var loggers = make(map[string]*zap.SugaredLogger)
+var (
+	jsonLoggers    = make(map[string]*zap.SugaredLogger)
+	consoleLoggers = make(map[string]*zap.SugaredLogger)
+)
 
 // 决定日志级别的环境变量名称
 var logLevelEnvName = "ENV"
@@ -45,6 +48,11 @@ var (
 	monitorTicker   *time.Ticker
 	monitorStopChan chan struct{}
 )
+
+func reset() {
+	jsonLoggers = make(map[string]*zap.SugaredLogger)
+	consoleLoggers = make(map[string]*zap.SugaredLogger)
+}
 
 // GetLogLevelEnvName 获取决定日志级别的环境变量名称
 func GetLogLevelEnvName() string {
@@ -72,7 +80,7 @@ func SetEnvLogLevel(envValue string, level zapcore.Level) {
 }
 
 func SetDefaultLogLevel(level zapcore.Level) {
-	loggers = make(map[string]*zap.SugaredLogger)
+	reset()
 	defaultLogLevel = level
 }
 
@@ -89,7 +97,7 @@ func StartMonitorLogLevel(duration time.Duration) {
 			case <-monitorTicker.C:
 				level := GetLogLevel()
 				if level != defaultLogLevel {
-					loggers = make(map[string]*zap.SugaredLogger)
+					reset()
 				}
 			case <-monitorStopChan:
 				return
@@ -142,7 +150,6 @@ func SetLogFile(logFile string, maxSize int, maxBackups int, maxAge int, compres
 }
 
 func getLogger(encoderFun func(encoderConfig zapcore.EncoderConfig) zapcore.Encoder) *zap.Logger {
-	//core := zapcore.NewCore(encoderFun(config), zapcore.AddSync(os.Stdout), GetLogLevel())
 	core := zapcore.NewCore(encoderFun(config), writeSyncer, GetLogLevel())
 	return zap.New(core, zap.AddCaller(), zap.AddStacktrace(zap.WarnLevel))
 }
@@ -182,9 +189,9 @@ func JSONLogger(names ...string) *zap.SugaredLogger {
 	} else {
 		name = "default"
 	}
-	if logger, ok = loggers[name]; !ok {
+	if logger, ok = jsonLoggers[name]; !ok {
 		logger = NewJSONLogger(name)
-		loggers[name] = logger
+		jsonLoggers[name] = logger
 	}
 	return logger
 }
@@ -200,9 +207,9 @@ func ConsoleLogger(names ...string) *zap.SugaredLogger {
 	} else {
 		name = "default"
 	}
-	if logger, ok = loggers[name]; !ok {
+	if logger, ok = consoleLoggers[name]; !ok {
 		logger = NewConsoleLogger(name)
-		loggers[name] = logger
+		consoleLoggers[name] = logger
 	}
 	return logger
 }
