@@ -1,6 +1,7 @@
 package logs
 
 import (
+	"fmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -149,9 +150,18 @@ func SetLogFile(logFile string, maxSize int, maxBackups int, maxAge int, compres
 	SetWriteSyncer(&w)
 }
 
-func getLogger(encoderFun func(encoderConfig zapcore.EncoderConfig) zapcore.Encoder) *zap.Logger {
+func getLogger(encoderFun func(encoderConfig zapcore.EncoderConfig) zapcore.Encoder, callerSkips ...int) *zap.Logger {
 	core := zapcore.NewCore(encoderFun(config), writeSyncer, GetLogLevel())
-	return zap.New(core, zap.AddCaller(), zap.AddStacktrace(zap.WarnLevel))
+	callerSkip := 0
+	if len(callerSkips) > 0 {
+		callerSkip = callerSkips[0]
+	}
+	return zap.New(
+		core,
+		zap.AddCaller(),
+		zap.AddStacktrace(zap.WarnLevel),
+		zap.AddCallerSkip(callerSkip),
+	)
 }
 
 // NewConsoleLogger 创建控制台格式日志器
@@ -166,9 +176,31 @@ func NewConsoleLogger(names ...string) *zap.SugaredLogger {
 	return logger.Sugar()
 }
 
+func NewConsoleLoggerWithCallerSkip(skip int, names ...string) *zap.SugaredLogger {
+	logger := getLogger(zapcore.NewConsoleEncoder, skip)
+	if len(names) > 0 {
+		name := names[0]
+		if name != "" {
+			logger.Named(name)
+		}
+	}
+	return logger.Sugar()
+}
+
 // NewJSONLogger 创建 JSON 格式日志器
 func NewJSONLogger(names ...string) *zap.SugaredLogger {
 	logger := getLogger(zapcore.NewJSONEncoder)
+	if len(names) > 0 {
+		name := names[0]
+		if name != "" {
+			logger.Named(name)
+		}
+	}
+	return logger.Sugar()
+}
+
+func NewJSONLoggerWithCallerSkip(skip int, names ...string) *zap.SugaredLogger {
+	logger := getLogger(zapcore.NewJSONEncoder, skip)
 	if len(names) > 0 {
 		name := names[0]
 		if name != "" {
@@ -196,6 +228,24 @@ func JSONLogger(names ...string) *zap.SugaredLogger {
 	return logger
 }
 
+func JSONLoggerWithCallerSkip(skip int, names ...string) *zap.SugaredLogger {
+	var (
+		logger *zap.SugaredLogger
+		ok     bool
+		name   string
+	)
+	if len(names) > 0 {
+		name = names[0]
+	} else {
+		name = fmt.Sprintf("skip_%d", skip)
+	}
+	if logger, ok = jsonLoggers[name]; !ok {
+		logger = NewJSONLoggerWithCallerSkip(skip, name)
+		jsonLoggers[name] = logger
+	}
+	return logger
+}
+
 func ConsoleLogger(names ...string) *zap.SugaredLogger {
 	var (
 		logger *zap.SugaredLogger
@@ -214,6 +264,28 @@ func ConsoleLogger(names ...string) *zap.SugaredLogger {
 	return logger
 }
 
+func ConsoleLoggerWithCallerSkip(skip int, names ...string) *zap.SugaredLogger {
+	var (
+		logger *zap.SugaredLogger
+		ok     bool
+		name   string
+	)
+	if len(names) > 0 {
+		name = names[0]
+	} else {
+		name = fmt.Sprintf("skip_%d", skip)
+	}
+	if logger, ok = consoleLoggers[name]; !ok {
+		logger = NewConsoleLoggerWithCallerSkip(skip, name)
+		consoleLoggers[name] = logger
+	}
+	return logger
+}
+
 func Logger(names ...string) *zap.SugaredLogger {
 	return JSONLogger(names...)
+}
+
+func CallerSkipLogger(skip int, names ...string) *zap.SugaredLogger {
+	return JSONLoggerWithCallerSkip(skip, names...)
 }
